@@ -6,7 +6,7 @@
     "dependencies": {
         "lodash.isnative": "^3.0.0"
     },
-    "version": "3.0.1",
+    "version": "3.0.2",
     "description": "The modern build of lodash’s `_.debounce` as a module.",
     "reposType": "npm"
 }
