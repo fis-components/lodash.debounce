@@ -1,19 +1,20 @@
 /**
- * lodash 3.1.1 (Custom Build) <https://lodash.com/>
+ * lodash 3.0.0 (Custom Build) <https://lodash.com/>
  * Build: `lodash modern modularize exports="npm" -o ./`
  * Copyright 2012-2015 The Dojo Foundation <http://dojofoundation.org/>
- * Based on Underscore.js 1.8.3 <http://underscorejs.org/LICENSE>
+ * Based on Underscore.js 1.7.0 <http://underscorejs.org/LICENSE>
  * Copyright 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
  * Available under MIT license <https://lodash.com/license>
  */
-var getNative = require('lodash._getnative');
+var isFunction = require('lodash.isfunction'),
+    isNative = require('lodash.isnative');
 
 /** Used as the `TypeError` message for "Functions" methods. */
 var FUNC_ERROR_TEXT = 'Expected a function';
 
 /* Native method references for those with the same name as other `lodash` methods. */
 var nativeMax = Math.max,
-    nativeNow = getNative(Date, 'now');
+    nativeNow = isNative(nativeNow = Date.now) && nativeNow;
 
 /**
  * Gets the number of milliseconds that have elapsed since the Unix epoch
@@ -24,9 +25,7 @@ var nativeMax = Math.max,
  * @category Date
  * @example
  *
- * _.defer(function(stamp) {
- *   console.log(_.now() - stamp);
- * }, _.now());
+ * _.defer(function(stamp) { console.log(_.now() - stamp); }, _.now());
  * // => logs the number of milliseconds it took for the deferred function to be invoked
  */
 var now = nativeNow || function() {
@@ -34,13 +33,12 @@ var now = nativeNow || function() {
 };
 
 /**
- * Creates a debounced function that delays invoking `func` until after `wait`
- * milliseconds have elapsed since the last time the debounced function was
- * invoked. The debounced function comes with a `cancel` method to cancel
- * delayed invocations. Provide an options object to indicate that `func`
- * should be invoked on the leading and/or trailing edge of the `wait` timeout.
- * Subsequent calls to the debounced function return the result of the last
- * `func` invocation.
+ * Creates a function that delays invoking `func` until after `wait` milliseconds
+ * have elapsed since the last time it was invoked. The created function comes
+ * with a `cancel` method to cancel delayed invocations. Provide an options
+ * object to indicate that `func` should be invoked on the leading and/or
+ * trailing edge of the `wait` timeout. Subsequent calls to the debounced
+ * function return the result of the last `func` invocation.
  *
  * **Note:** If `leading` and `trailing` options are `true`, `func` is invoked
  * on the trailing edge of the timeout only if the the debounced function is
@@ -53,7 +51,7 @@ var now = nativeNow || function() {
  * @memberOf _
  * @category Function
  * @param {Function} func The function to debounce.
- * @param {number} [wait=0] The number of milliseconds to delay.
+ * @param {number} wait The number of milliseconds to delay.
  * @param {Object} [options] The options object.
  * @param {boolean} [options.leading=false] Specify invoking on the leading
  *  edge of the timeout.
@@ -108,17 +106,17 @@ function debounce(func, wait, options) {
       maxWait = false,
       trailing = true;
 
-  if (typeof func != 'function') {
+  if (!isFunction(func)) {
     throw new TypeError(FUNC_ERROR_TEXT);
   }
-  wait = wait < 0 ? 0 : (+wait || 0);
+  wait = wait < 0 ? 0 : wait;
   if (options === true) {
     var leading = true;
     trailing = false;
   } else if (isObject(options)) {
-    leading = !!options.leading;
+    leading = options.leading;
     maxWait = 'maxWait' in options && nativeMax(+options.maxWait || 0, wait);
-    trailing = 'trailing' in options ? !!options.trailing : trailing;
+    trailing = 'trailing' in options ? options.trailing : trailing;
   }
 
   function cancel() {
@@ -128,35 +126,41 @@ function debounce(func, wait, options) {
     if (maxTimeoutId) {
       clearTimeout(maxTimeoutId);
     }
-    lastCalled = 0;
     maxTimeoutId = timeoutId = trailingCall = undefined;
-  }
-
-  function complete(isCalled, id) {
-    if (id) {
-      clearTimeout(id);
-    }
-    maxTimeoutId = timeoutId = trailingCall = undefined;
-    if (isCalled) {
-      lastCalled = now();
-      result = func.apply(thisArg, args);
-      if (!timeoutId && !maxTimeoutId) {
-        args = thisArg = undefined;
-      }
-    }
   }
 
   function delayed() {
     var remaining = wait - (now() - stamp);
     if (remaining <= 0 || remaining > wait) {
-      complete(trailingCall, maxTimeoutId);
+      if (maxTimeoutId) {
+        clearTimeout(maxTimeoutId);
+      }
+      var isCalled = trailingCall;
+      maxTimeoutId = timeoutId = trailingCall = undefined;
+      if (isCalled) {
+        lastCalled = now();
+        result = func.apply(thisArg, args);
+        if (!timeoutId && !maxTimeoutId) {
+          args = thisArg = null;
+        }
+      }
     } else {
       timeoutId = setTimeout(delayed, remaining);
     }
   }
 
   function maxDelayed() {
-    complete(trailing, timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    maxTimeoutId = timeoutId = trailingCall = undefined;
+    if (trailing || (maxWait !== wait)) {
+      lastCalled = now();
+      result = func.apply(thisArg, args);
+      if (!timeoutId && !maxTimeoutId) {
+        args = thisArg = null;
+      }
+    }
   }
 
   function debounced() {
@@ -196,7 +200,7 @@ function debounce(func, wait, options) {
       result = func.apply(thisArg, args);
     }
     if (isCalled && !timeoutId && !maxTimeoutId) {
-      args = thisArg = undefined;
+      args = thisArg = null;
     }
     return result;
   }
@@ -205,8 +209,10 @@ function debounce(func, wait, options) {
 }
 
 /**
- * Checks if `value` is the [language type](https://es5.github.io/#x8) of `Object`.
+ * Checks if `value` is the language type of `Object`.
  * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+ *
+ * **Note:** See the [ES5 spec](https://es5.github.io/#x8) for more details.
  *
  * @static
  * @memberOf _
@@ -228,7 +234,7 @@ function isObject(value) {
   // Avoid a V8 JIT bug in Chrome 19-20.
   // See https://code.google.com/p/v8/issues/detail?id=2291 for more details.
   var type = typeof value;
-  return !!value && (type == 'object' || type == 'function');
+  return type == 'function' || (value && type == 'object') || false;
 }
 
 module.exports = debounce;
