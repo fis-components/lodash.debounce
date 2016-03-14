@@ -1,0 +1,10 @@
+{
+    "repos": "https://github.com/lodash/lodash",
+    "tag": "master",
+    "name": "lodash.debounce",
+    "main": "index.js",
+    "dependencies": {},
+    "version": "3.1.0",
+    "description": "The modern build of lodash’s `_.debounce` as a module.",
+    "reposType": "npm"
+}
